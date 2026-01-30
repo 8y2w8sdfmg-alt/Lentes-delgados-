@@ -1,0 +1,163 @@
+// Variables globales para los controles
+let sliderFoco, sliderPos, sliderAltura;
+let selTipoLente;
+let labelF, labelPos, labelAlt;
+
+function setup() {
+  // 1. Crear el lienzo (Canvas)
+  createCanvas(800, 500);
+  
+  // 2. Crear controles (Inputs) usando p5.js
+  
+  // Selector de tipo de lente
+  createP('<b>Tipo de Lente:</b>').position(20, 520);
+  selTipoLente = createSelect();
+  selTipoLente.position(120, 535);
+  selTipoLente.option('Convergente (Convexa)');
+  selTipoLente.option('Divergente (Cóncava)');
+  selTipoLente.selected('Convergente (Convexa)');
+
+  // Slider Distancia Focal
+  labelF = createDiv(); labelF.position(20, 570);
+  sliderFoco = createSlider(30, 150, 80);
+  sliderFoco.position(150, 570); sliderFoco.style('width', '200px');
+
+  // Slider Posición Objeto
+  labelPos = createDiv(); labelPos.position(20, 600);
+  sliderPos = createSlider(40, 350, 150);
+  sliderPos.position(150, 600); sliderPos.style('width', '200px');
+
+  // Slider Altura Objeto
+  labelAlt = createDiv(); labelAlt.position(20, 630);
+  sliderAltura = createSlider(10, 100, 60);
+  sliderAltura.position(150, 630); sliderAltura.style('width', '200px');
+}
+
+function draw() {
+  background(255);
+  
+  // --- A. OBTENER VALORES ---
+  let tipo = selTipoLente.value();
+  let f = sliderFoco.value();
+  let do_pos = sliderPos.value();
+  let ho = sliderAltura.value();
+  
+  // Actualizar textos
+  labelF.html(`Distancia Focal (f): <b>${f} px</b>`);
+  labelPos.html(`Posición Objeto (do): <b>${do_pos} px</b>`);
+  labelAlt.html(`Altura Objeto (ho): <b>${ho} px</b>`);
+
+  // Centro del canvas
+  let cx = width / 2;
+  let cy = height / 2;
+
+  // Lógica de Lente (Convexa +, Cóncava -)
+  let fMath = (tipo === 'Convergente (Convexa)') ? f : -f;
+
+  // --- B. CÁLCULOS FÍSICOS ---
+  // Ecuación de lentes: 1/f = 1/do + 1/di  =>  di = (f*do) / (do - f)
+  let di = (fMath * do_pos) / (do_pos - fMath);
+  // Magnificación
+  let m = -di / do_pos;
+  let hi = m * ho;
+
+  // --- C. DIBUJAR GUIAS ---
+  // Eje principal
+  stroke(150); setLineDash([5, 5]);
+  line(0, cy, width, cy);
+  setLineDash([]); // Reset linea sólida
+
+  // Dibujar Focos
+  fill('green'); noStroke();
+  circle(cx - f, cy, 8); text("F", cx - f - 5, cy + 20);
+  circle(cx + f, cy, 8); text("F'", cx + f - 5, cy + 20);
+
+  // --- D. DIBUJAR LENTE ---
+  stroke(50); strokeWeight(3);
+  if (tipo === 'Convergente (Convexa)') {
+    line(cx, cy - 100, cx, cy + 100);
+    // Flechas hacia afuera
+    line(cx, cy - 100, cx - 10, cy - 90); line(cx, cy - 100, cx + 10, cy - 90);
+    line(cx, cy + 100, cx - 10, cy + 90); line(cx, cy + 100, cx + 10, cy + 90);
+    
+    // Forma vidrio sutil
+    noStroke(); fill(200, 230, 255, 100);
+    ellipse(cx, cy, 30, 200);
+  } else {
+    line(cx, cy - 100, cx, cy + 100);
+    // Flechas hacia adentro (invertidas)
+    line(cx, cy - 100, cx - 10, cy - 110); line(cx, cy - 100, cx + 10, cy - 110);
+    line(cx, cy + 100, cx - 10, cy + 110); line(cx, cy + 100, cx + 10, cy + 110);
+    
+    // Forma vidrio sutil
+    noStroke(); fill(200, 230, 255, 100);
+    rect(cx - 10, cy - 100, 20, 200);
+  }
+
+  // --- E. DIBUJAR OBJETO ---
+  drawArrow(cx - do_pos, cy, -ho, 'red'); // Objeto (rojo)
+
+  // --- F. DIBUJAR IMAGEN ---
+  // Si di es muy grande (infinito), no dibujamos
+  if (Math.abs(di) < 3000) {
+    let imgColor = (di < 0) ? color(0, 100, 255, 100) : 'blue'; // Virtual transparente, Real sólida
+    // Ojo: en p5 y crece abajo. Si hi es negativo (invertida), pasamos negativo a la función
+    drawArrow(cx + di, cy, -hi, imgColor);
+  }
+
+  // --- G. RAYOS DE LUZ (Trazado) ---
+  strokeWeight(1.5); stroke('orange');
+  let objX = cx - do_pos;
+  let objY = cy - ho;
+
+  // 1. Rayo Paralelo
+  line(objX, objY, cx, objY); // Del objeto a la lente
+  if (tipo === 'Convergente (Convexa)') {
+    // Pasa por Foco derecho
+    line_extended(cx, objY, cx + f, cy); 
+  } else {
+    // Diverge desde Foco izquierdo
+    // Línea real divergiendo
+    let slope = (objY - cy) / (0 - (-f)); // Pendiente desde foco virtual
+    line(cx, objY, width, objY + slope * (width/2));
+    // Proyección virtual punteada
+    stroke(255, 165, 0, 100); setLineDash([5,5]);
+    line(cx, objY, cx - f, cy);
+    setLineDash([]); stroke('orange');
+  }
+
+  // 2. Rayo Central (Pasa por el centro sin desviarse)
+  // Simplemente extendemos la línea que une el objeto con (cx, cy)
+  line_extended(objX, objY, cx, cy);
+
+}
+
+// --- FUNCIONES AUXILIARES ---
+
+function drawArrow(xBase, yBase, h, col) {
+  stroke(col); fill(col); strokeWeight(2);
+  line(xBase, yBase, xBase, yBase + h);
+  // Cabeza flecha
+  let arrowSize = 6;
+  let yTip = yBase + h;
+  // Dibujar triángulo simple en la punta
+  let direction = (h < 0) ? -1 : 1; 
+  triangle(xBase - arrowSize, yTip - (direction*(-arrowSize)), 
+           xBase + arrowSize, yTip - (direction*(-arrowSize)), 
+           xBase, yTip);
+}
+
+// Función para dibujar una línea que atraviesa dos puntos y sigue hasta el borde
+function line_extended(x1, y1, x2, y2) {
+  // Calculamos pendiente y dibujamos un segmento largo
+  let slope = (y2 - y1) / (x2 - x1);
+  let intercept = y1 - slope * x1;
+  // Dibujamos desde x1 hasta el final del canvas a la derecha
+  let xEnd = width;
+  let yEnd = slope * xEnd + intercept;
+  line(x1, y1, xEnd, yEnd);
+}
+
+function setLineDash(list) {
+  drawingContext.setLineDash(list);
+}
